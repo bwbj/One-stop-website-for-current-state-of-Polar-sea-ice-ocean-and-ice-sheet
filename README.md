@@ -1,0 +1,2 @@
+# proj_carto_PS_EG
+project netcdf file with lat/lon and sea ice parameter into PolarSteoregraphic(-45) and EASE-Grid2.0, then plot it
