@@ -1,0 +1,33 @@
+%% convert from lat/lon to X/Y coordiantes of EASE-GRID(Lambert Azimuthal Equal Area Projection)
+% formula from: <EASE-Grid 2.0: Incremental but Significant Improvements for Earth-Gridded Data Sets>
+% ATTENTION: input lat/lon in degree, calculating trigonometric function in radians (by deg2rad)!!!
+% consistence of < Map Projections-A Working Manual>(P187&333) and <Mary J. Brodzik‘s paper>
+% author: Teng Li, litengbnu@foxmail.com 20170727
+function [x, y] = latlon2ease_isprs(lat, lon) 
+% input: lat/lon scalar or matrix; 
+% output: corresponding X/Y pixel to pixel;
+% geodetic parameter definitions
+% equatorial radius = Semimajor Axis: 6378137.0
+a = 6378137.0;
+% polar radius = Semiminor Axis: 6356752.314245179
+b = 6356752.314245179;
+% eccentricity of the ellipsoid, Inverse Flattening: 298.257223563
+e = sqrt(1 - (b / a)^2);
+% map reference latitude, but useless
+phi_0 = 90;
+% map reference longitude
+lamda_0 = 0;
+% latitude of true scale
+phi_1 = deg2rad(90);
+% north latitude
+phi = deg2rad(lat);
+% longitude east of Greenwich
+lamda = lon * pi /180;
+% formula(2) = function handle
+q = @(phi)((1 - e^2) * (sin(phi) ./ (1 - e^2 * sin(phi).^2 ) - log((1 - e * sin(phi)) ./ (1 + e * sin(phi))) / (2 * e)));
+q_p = q(phi_1);
+rho = a * sqrt(q_p - q(phi));
+x = rho .* sin(lamda - lamda_0);
+y = -rho .* cos(lamda - lamda_0);
+% verified by  tie-pont of (-1,097,798.389, -2,453,462.278 Meters) and (-24.106065, 65.740721 Decimal Degrees)
+end
