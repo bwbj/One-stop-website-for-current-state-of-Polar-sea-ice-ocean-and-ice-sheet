@@ -1,0 +1,27 @@
+%% read variables in NetCDF and padding NaN in four margins
+% author: Teng Li, litengbnu@foxmail.com 20170728
+% residual: need check valid data range, such as (0, 100)
+function [mrg_lat, mrg_lon, mrg_par] = margin_nan(file_name, parameter)
+% input: NetCDF from YiFan-Ding; output: lat/lon/sea ice parameter matrix with expanded NaN in margin
+% example: [mrg_lat, mrg_lon, mrg_par] = margin_nan('asi-AMSR2-n6250-20170711.nc', 'AMSR2_SIC')
+% !!specification: background = NaN, LandMask = -1;!!
+% read NetCDF file's lat/lon and sea ice parameter.
+nc_lat = ncread(file_name, 'latitude');
+nc_lon = ncread(file_name, 'longitude');
+nc_par = ncread(file_name, parameter);
+% padding marginal NaN and their lat/lon to avoid resampling incorrectly.
+margin_model = ones(size(nc_par) + 2);
+[margin_model(1, :), margin_model(:, 1), margin_model(end, :), margin_model(:, end)] = deal(nan);
+[mrg_lat, mrg_lon, mrg_par] = deal(margin_model);
+[mrg_lat(mrg_lat == 1), mrg_lon(mrg_lon == 1), mrg_par(mrg_par == 1)] = deal(nc_lat, nc_lon, nc_par);
+% fill four margin's lat/lon value linearly, then four corner
+mrg_lat(1, :) = 2 * mrg_lat(2, :) - mrg_lat(3, :);
+mrg_lat(end, :) = 2 * mrg_lat(end -1, :) - mrg_lat(end - 2, :);
+mrg_lat(:, 1) = 2 * mrg_lat(:, 2) - mrg_lat(:, 3);
+mrg_lat(:, end) = 2 * mrg_lat(:, end -1) - mrg_lat(:, end - 2);
+
+mrg_lon(1, :) = 2 * mrg_lon(2, :) - mrg_lon(3, :);
+mrg_lon(end, :) = 2 * mrg_lon(end -1, :) - mrg_lon(end - 2, :);
+mrg_lon(:, 1) = 2 * mrg_lon(:, 2) - mrg_lon(:, 3);
+mrg_lon(:, end) = 2 * mrg_lon(:, end -1) - mrg_lon(:, end - 2);
+end
