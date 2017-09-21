@@ -1,0 +1,129 @@
+%%  mapping sea ice variables from NetCDF based on m_map 3rd-party library
+% reference: https://www.eoas.ubc.ca/~rich/map.html#2._SSMI_Ice_cover
+% author: Teng Li, litengbnu@foxmail.com 20170910
+% 20170916 modified: asymmetrical in orignial regular grid(polar point is not center of matrix!)
+% to correct the offset(especially in Y direction), calculating start not by dividing 2
+% 20170920 modified: fix upper-limit of colormap to make time-series comparable.
+% delete (>1.015) * trans_white / max(par_PS(:)); then add a way larger
+% number into upper-limit to ensure to surpass (>1.015) * trans_white
+function fig = carto_png(x_PS_reg, y_PS_reg, par_PS, attri_carto) 
+% setting up projection paramter, based on which m_proj was initiated
+% trans_white = max(par_PS(:));
+resolu = attri_carto.resolution;
+par_PS(par_PS<0) = nan;
+major_axis = 6378137;
+eccentricity = 0.08181919;
+out_bound = 50;
+proj_lat = 90;
+true_lat = 70;
+ytick_label = [-85, -80, -70, 60, 55];
+titleref_lon = 135;
+if strcmp(attri_carto.polar, 'N')
+    proj_lon = -45; 
+    XaxisLocation = 'bottom';
+else
+    out_bound = -out_bound;
+    proj_lon = 0;
+    proj_lat = -proj_lat;
+    true_lat = -true_lat;
+    XaxisLocation = 'top';
+    titleref_lon = 0;
+    ytick_label = -ytick_label;
+end
+lower_caxis = 0;
+switch attri_carto.parameter
+    case 'Thickness'
+        upper_caxis = 100;
+%         add other parameter options here!
+    otherwise
+        upper_caxis = 50;
+end
+m_proj('stereographic', 'lon', proj_lon, 'latitude', proj_lat, 'radius', 90 - abs(out_bound));
+%% expanding orignal variable array to at least out-boundary / radius_thresh
+[~, radius_thresh] = polarstereo_fwd(out_bound, proj_lon, major_axis, eccentricity, true_lat, proj_lon);
+radius_thresh = abs(radius_thresh);
+%{
+% 牺牲结构优美，换取简明易懂
+%  choose the larger one bwtween 2*radius and orignal dimension(row / col)
+pad_col = ceil(max(radius_thresh*2, x_PS_reg(1, end) - x_PS_reg(1, 1)+ resolu) / resolu);
+pad_col_start = ceil((pad_col - size(par_PS, 2)) / 2)+1;
+pad_row = ceil(max(radius_thresh*2, y_PS_reg(1, 1) - y_PS_reg(end, 1)+ resolu) / resolu);
+pad_row_start = ceil((pad_row - size(par_PS, 1)) / 2)+1;
+par_pad = zeros(pad_row, pad_col);
+% fit the orignal array in-center symmetrically, exclude aliquant viaceil() and +1
+par_pad(pad_row_start: pad_row_start+ size(par_PS, 1)- 1, pad_col_start:pad_col_start+size(par_PS, 2) - 1) = par_PS;
+%}
+% choose the larger one bwtween 2*radius and orignal dimension(row / col)
+% then calculate the start point of original regular grid in expanding array.
+if radius_thresh*2 > (x_PS_reg(1, end) - x_PS_reg(1, 1)+ resolu)
+    pad_col = ceil(radius_thresh*2 / resolu);
+    pad_col_start = ceil((radius_thresh - abs(x_PS_reg(1, 1))) / resolu) + 1;
+    meshgrid_x = (1:pad_col)*resolu-(pad_col_start * resolu + abs(x_PS_reg(1, 1)));
+else
+    pad_col = size(par_PS, 2);
+    pad_col_start = 1;
+    meshgrid_x = x_PS_reg(1,:);
+end
+% 牺牲结构优美，换取简明易懂
+if radius_thresh*2 > (y_PS_reg(1, 1) - y_PS_reg(end, 1)+ resolu)
+    pad_row = pad_col;
+    pad_row_start = ceil((radius_thresh - abs(y_PS_reg(1, 1))) / resolu) + 1;
+    meshgrid_y = (1:pad_row)*resolu-(pad_row_start * resolu + abs(y_PS_reg(1, 1)));
+else
+    pad_row = size(par_PS, 1);
+    pad_row_start = 1;
+    meshgrid_y = y_PS_reg(:,1);
+end
+par_pad = zeros(pad_row, pad_col);
+% fit the orignal array in-center symmetrically, exclude aliquant viaceil() and +1
+par_pad(pad_row_start: pad_row_start+ size(par_PS, 1)- 1, pad_col_start:pad_col_start+size(par_PS, 2) - 1) = par_PS;
+% construct newly-expanded x_pad and y_pad, and set white beyond out circle
+radius_thresh = radius_thresh.^2;
+% 20170910 night：出图偏移，Y大X小，此句有问题！
+% [X_pad, Y_pad] = meshgrid((1:pad_col)*resolu-pad_col*resolu/2, (1:pad_row)*resolu-pad_row*resolu/2);
+[X_pad, Y_pad] = meshgrid(meshgrid_x, meshgrid_y);
+radius_dis = X_pad.^2 + Y_pad.^2;
+% original strategy: scale larger then 101 to suppress customized colormap
+% trans_white = max(par_PS(:)); and colormap([jet(100); 1 1 1]);
+% par_pad(radius_dis > radius_thresh) = trans_white *1.015;
+% 20170920 strategy: surpass 1.01 of colormap's upper-limit to appear white.
+par_pad(radius_dis > radius_thresh) = upper_caxis * 2;
+% calculate the three corner (1. bottom-left, 2. bottom-right, 3. up-left) 's lat / lon;
+[lat_cor, lon_cor] = polarstereo_inv([X_pad(end, 1), X_pad(end, end), X_pad(1, 1)],...
+    [Y_pad(end, 1), Y_pad(end, end), Y_pad(1, 1)], major_axis, eccentricity, true_lat, proj_lon);
+% imitate from https://www.eoas.ubc.ca/~rich/map.html#2._SSMI_Ice_cover
+[MAPX, ~] = m_ll2xy([lon_cor(1), lon_cor(2)], [lat_cor(1), lat_cor(2)], 'clip', 'off');
+[~, MAPY] = m_ll2xy([lon_cor(3), lon_cor(1)], [lat_cor(3), lat_cor(1)], 'clip', 'off');
+% to make [MAPY] starts with positive and ends with negative
+MAPY = sort(MAPY, 'descend');
+% chose positive-Y limit as title objet's reference position
+[~, title_posref] = m_ll2xy(titleref_lon, out_bound, 'clip', 'off');
+% for latter: set(title_h,  'Position', [ 0.0, title_posref + 0.05])
+%% enjoy youself on canvas!
+fig_width = 16; fig_high = 13;
+fig = figure('units','centimeters','position',[10, 10, fig_width, fig_high], 'PaperPositionMode', 'auto');
+% plot in as an image unit circle
+% ('CDataMapping', 'scaled') is as same effect as imagesc();
+image(MAPX, MAPY, par_pad, 'CDataMapping', 'scaled');
+caxis([lower_caxis, upper_caxis*1.015]);
+% fix scale to be comparable
+set(gca, 'ydir', 'normal');
+colormap([jet(100); 1 1 1]);
+% caxis([min(data(:)), max(data(:))])
+m_coast('patch', [.6 .6 .6]);
+m_grid_lt('linewi', 1.5, 'tickdir', 'out', 'fontsize', 9, 'ytick', numel(ytick_label),  'yticklabels', ytick_label, 'XaxisLocation', XaxisLocation);
+%% decorate accessories
+% to avoid underline score, whose meaning would be transferred  by LaTex-Engine.
+parameter = strrep(attri_carto.parameter, '_', ' ');
+title_string = [attri_carto.date_string,' ' , attri_carto.sensor, ' ' , attri_carto.parameter];
+title_h = title(title_string ,'fontsize', 15, 'fontweight', 'bold');
+colorbar_h = colorbar('v');
+% unit from NetCDF attribute's principle: as concise as possible but avoid ambiguity!
+legend_string = [parameter, ' (', attri_carto.unit, ')'];
+set(get(colorbar_h, 'ylabel'), 'string', legend_string, 'fontsize', 12);
+set(gca, 'Position', [0.05, 0.035, 0.7,0.88])
+set(colorbar_h, 'Position',  [0.82, 0.035, 0.05, 0.9]);
+set(title_h,  'Position', [ 0.0, title_posref + 0.07])
+text(-0.04, 0.02, {'Created by', 'GCESS-PRSDC'}, 'units', 'normalized')
+set(gca, 'color', [0, 0, 0.6667])
+end
