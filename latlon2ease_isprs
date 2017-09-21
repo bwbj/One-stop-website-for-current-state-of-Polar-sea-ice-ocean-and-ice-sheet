@@ -3,8 +3,9 @@
 % ATTENTION: input lat/lon in degree, calculating trigonometric function in radians (by deg2rad)!!!
 % consistence of < Map Projections-A Working Manual>(P187&333) and <Mary J. Brodzik‘s paper>
 % author: Teng Li, litengbnu@foxmail.com 20170727
-function [x, y] = latlon2ease_isprs(lat, lon) 
-% input: lat/lon scalar or matrix; 
+% 20170905 modified: accommodating North and South at the same time
+function [x, y] = latlon2ease_isprs(lat, lon, polar)
+% input: lat/lon scalar or matrix;
 % output: corresponding X/Y pixel to pixel;
 % geodetic parameter definitions
 % equatorial radius = Semimajor Axis: 6378137.0
@@ -14,7 +15,7 @@ b = 6356752.314245179;
 % eccentricity of the ellipsoid, Inverse Flattening: 298.257223563
 e = sqrt(1 - (b / a)^2);
 % map reference latitude, but useless
-phi_0 = 90;
+% phi_0 = 90;
 % map reference longitude
 lamda_0 = 0;
 % latitude of true scale
@@ -26,8 +27,17 @@ lamda = lon * pi /180;
 % formula(2) = function handle
 q = @(phi)((1 - e^2) * (sin(phi) ./ (1 - e^2 * sin(phi).^2 ) - log((1 - e * sin(phi)) ./ (1 + e * sin(phi))) / (2 * e)));
 q_p = q(phi_1);
-rho = a * sqrt(q_p - q(phi));
+if strcmp(polar, 'N')
+    rho = a * sqrt(q_p - q(phi));
+else
+    rho = a * sqrt(q_p + q(phi));
+end
+
 x = rho .* sin(lamda - lamda_0);
-y = -rho .* cos(lamda - lamda_0);
+if strcmp(polar, 'N')
+    y = -rho .* cos(lamda - lamda_0);
+else
+    y = rho .* cos(lamda - lamda_0);
+end
 % verified by  tie-pont of (-1,097,798.389, -2,453,462.278 Meters) and (-24.106065, 65.740721 Decimal Degrees)
 end
