@@ -35,10 +35,17 @@ switch attri_carto.parameter
     case 'Thickness'
         upper_caxis = 100;
 %         add other parameter options here!
+    case 'THK'
+        upper_caxis = 200;
+    case 'MPF'
+        upper_caxis = 70;
+    case 'SST'
+        lower_caxis = -3;
+        upper_caxis = 18;
     otherwise
-        upper_caxis = 50;
+        upper_caxis = 100;
 end
-m_proj('stereographic', 'lon', proj_lon, 'latitude', proj_lat, 'radius', 90 - abs(out_bound));
+m_proj_lt('stereographic', 'lon', proj_lon, 'latitude', proj_lat, 'radius', 90 - abs(out_bound));
 %% expanding orignal variable array to at least out-boundary / radius_thresh
 [~, radius_thresh] = polarstereo_fwd(out_bound, proj_lon, major_axis, eccentricity, true_lat, proj_lon);
 radius_thresh = abs(radius_thresh);
@@ -92,16 +99,18 @@ par_pad(radius_dis > radius_thresh) = upper_caxis * 2;
 [lat_cor, lon_cor] = polarstereo_inv([X_pad(end, 1), X_pad(end, end), X_pad(1, 1)],...
     [Y_pad(end, 1), Y_pad(end, end), Y_pad(1, 1)], major_axis, eccentricity, true_lat, proj_lon);
 % imitate from https://www.eoas.ubc.ca/~rich/map.html#2._SSMI_Ice_cover
-[MAPX, ~] = m_ll2xy([lon_cor(1), lon_cor(2)], [lat_cor(1), lat_cor(2)], 'clip', 'off');
-[~, MAPY] = m_ll2xy([lon_cor(3), lon_cor(1)], [lat_cor(3), lat_cor(1)], 'clip', 'off');
+[MAPX, ~] = m_ll2xy_lt([lon_cor(1), lon_cor(2)], [lat_cor(1), lat_cor(2)], 'clip', 'off');
+[~, MAPY] = m_ll2xy_lt([lon_cor(3), lon_cor(1)], [lat_cor(3), lat_cor(1)], 'clip', 'off');
 % to make [MAPY] starts with positive and ends with negative
 MAPY = sort(MAPY, 'descend');
 % chose positive-Y limit as title objet's reference position
-[~, title_posref] = m_ll2xy(titleref_lon, out_bound, 'clip', 'off');
+[~, title_posref] = m_ll2xy_lt(titleref_lon, out_bound, 'clip', 'off');
 % for latter: set(title_h,  'Position', [ 0.0, title_posref + 0.05])
 %% enjoy youself on canvas!
 fig_width = 16; fig_high = 13;
-fig = figure('units','centimeters','position',[10, 10, fig_width, fig_high], 'PaperPositionMode', 'auto');
+% set 'visible' property to 'off' so figure export to file directly without showing
+fig = figure('units','centimeters','position',[10, 10, fig_width, fig_high],...
+    'PaperPositionMode', 'auto', 'visible', 'off');
 % plot in as an image unit circle
 % ('CDataMapping', 'scaled') is as same effect as imagesc();
 image(MAPX, MAPY, par_pad, 'CDataMapping', 'scaled');
@@ -110,8 +119,9 @@ caxis([lower_caxis, upper_caxis*1.015]);
 set(gca, 'ydir', 'normal');
 colormap([jet(100); 1 1 1]);
 % caxis([min(data(:)), max(data(:))])
-m_coast('patch', [.6 .6 .6]);
-m_grid_lt('linewi', 1.5, 'tickdir', 'out', 'fontsize', 9, 'ytick', numel(ytick_label),  'yticklabels', ytick_label, 'XaxisLocation', XaxisLocation);
+m_coast_lt('patch', [.6 .6 .6]);
+m_grid_lt('linewi', 1.5, 'tickdir', 'out', 'fontsize', 9, 'ytick', numel(ytick_label),...
+    'yticklabels', ytick_label, 'XaxisLocation', XaxisLocation);
 %% decorate accessories
 % to avoid underline score, whose meaning would be transferred  by LaTex-Engine.
 parameter = strrep(attri_carto.parameter, '_', ' ');
