@@ -1,11 +1,17 @@
-%% read variables in NetCDF and padding NaN in four margins
+%% read variables in NetCDF and padding -999 in four margins
 % author: Teng Li, litengbnu@foxmail.com 20170728
-% residual: need check valid data range, such as (0, 100)
-function [mrg_lat, mrg_lon, mrg_par] = margin_nan(file_name, parameter)
-% input: NetCDF from YiFan-Ding; output: lat/lon/sea ice parameter matrix with expanded NaN in margin
-% example: [mrg_lat, mrg_lon, mrg_par] = margin_nan('asi-AMSR2-n6250-20170711.nc', 'AMSR2_SIC')
-% !!specification: background = NaN, LandMask = -1;!!
-% read NetCDF file's lat/lon and sea ice parameter.
+% =========================================================
+% 20170905 modified: replace NaN of FillValue with -999 by convention
+% left work: need check valid data range, such as (0, 100)?
+% =========================================================
+% 20170910 modified: construct and maintain lookup table to scale or not
+% =========================================================
+function [mrg_lat, mrg_lon, mrg_par, scale] = margin_nan(file_name, parameter)
+% Input: intermediary NetCDF from YiFan-Ding;
+% Output: lat / lon / parameter matrix with expanded NaN in four margin
+% example: [mrg_lat, mrg_lon, mrg_par] = margin_nan('S_AMSR2_20170711_SIC.nc', 'AMSR2_SIC')
+% NaN value specification: MissingValue = -1, FillValue = -999;
+%% read NetCDF file's lat/lon and geophysical parameter.
 nc_lat = ncread(file_name, 'latitude');
 nc_lon = ncread(file_name, 'longitude');
 nc_par = ncread(file_name, parameter);
@@ -14,7 +20,7 @@ margin_model = ones(size(nc_par) + 2);
 [margin_model(1, :), margin_model(:, 1), margin_model(end, :), margin_model(:, end)] = deal(nan);
 [mrg_lat, mrg_lon, mrg_par] = deal(margin_model);
 [mrg_lat(mrg_lat == 1), mrg_lon(mrg_lon == 1), mrg_par(mrg_par == 1)] = deal(nc_lat, nc_lon, nc_par);
-% fill four margin's lat/lon value linearly, then four corner
+% fill four margin's lat / lon value linearly, then four corners
 mrg_lat(1, :) = 2 * mrg_lat(2, :) - mrg_lat(3, :);
 mrg_lat(end, :) = 2 * mrg_lat(end -1, :) - mrg_lat(end - 2, :);
 mrg_lat(:, 1) = 2 * mrg_lat(:, 2) - mrg_lat(:, 3);
@@ -24,4 +30,22 @@ mrg_lon(1, :) = 2 * mrg_lon(2, :) - mrg_lon(3, :);
 mrg_lon(end, :) = 2 * mrg_lon(end -1, :) - mrg_lon(end - 2, :);
 mrg_lon(:, 1) = 2 * mrg_lon(:, 2) - mrg_lon(:, 3);
 mrg_lon(:, end) = 2 * mrg_lon(:, end -1) - mrg_lon(:, end - 2);
+%{ 
+ATTENTION: how to judge scale from valid range or parameter name?
+% if whole range of positive parameter is less than 10, then times it by scale
+% scale_thresh = 10;
+% if range(nc_par(nc_par>0)) < scale_thresh
+%     scale = 100;
+% else
+%     scale = 1;
+% end
+%}
+% 20170910 modified: refer to predisposed parameter lookup table to scale
+scale_pool = {'IceThickness_useless'};
+if ismember(scale_pool, parameter)
+    scale = 100;
+else
+    scale = 1;
+end
+mrg_par(isnan(mrg_par)) = -999;
 end
