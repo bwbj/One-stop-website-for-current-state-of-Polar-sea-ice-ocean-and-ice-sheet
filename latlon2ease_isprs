@@ -1,9 +1,11 @@
 %% convert from lat/lon to X/Y coordiantes of EASE-GRID(Lambert Azimuthal Equal Area Projection)
 % formula from: <EASE-Grid 2.0: Incremental but Significant Improvements for Earth-Gridded Data Sets>
 % ATTENTION: input lat/lon in degree, calculating trigonometric function in radians (by deg2rad)!!!
-% consistence of < Map Projections-A Working Manual>(P187&333) and <Mary J. Brodzik‘s paper>
+% consistence of <Map Projections-A Working Manual>(P187&333) and <Mary J. Brodzik‘s paper>
 % author: Teng Li, litengbnu@foxmail.com 20170727
+% =========================================================
 % 20170905 modified: accommodating North and South at the same time
+% =========================================================
 function [x, y] = latlon2ease_isprs(lat, lon, polar)
 % input: lat/lon scalar or matrix;
 % output: corresponding X/Y pixel to pixel;
